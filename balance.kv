@@ -1,0 +1,42 @@
+#:import Led led.Led
+BoxLayout:
+  orientation: 'vertical'
+  padding: 10
+  Label:
+    id: display_lbl
+    font_size: 110
+    font_name: 'wwDigital'
+    text: 'Non Connect\u00e9'
+  BoxLayout:
+    size_hint_y: None
+    height: 50
+    padding: 5
+    spacing: 5
+    orientation: 'horizontal'
+    Button:
+      id: start_stop_btn
+      text: 'Enregistrer'
+      disabled: True
+    Spinner:
+      id: ports_list
+      text: 'Port S\u00e9rie'
+    Led:
+      id: led_in
+      size_hint_x: 0.05
+      source: 'shapes/contour_square.png'
+      auto_off: True
+      keep_ratio: False
+      allow_stretch: True
+    Button:
+      id: connect_btn
+      text: 'Connecter'
+    Button:
+      id: quit_btn
+      text: 'Quitter'
+      
+<PopupMessage@Popup>
+  size_hint: 0.5,0.25
+  pos_hint: {'right': 1,'top': 1}
+  auto_dismiss: True
+  Label:
+    id: message_content_lbl
