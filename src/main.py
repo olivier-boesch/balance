@@ -12,6 +12,14 @@
 
 __version__ = '0.8'
 
+# log level
+# import os
+# os.environ["KCFG_KIVY_LOG_LEVEL"] = "trace"
+
+# data orange in the data directory
+from kivy.resources import resource_add_path
+resource_add_path("/home/olivier/PycharmProjects/balance/src/")
+
 from kivy.utils import platform
 
 # ------------ modules
