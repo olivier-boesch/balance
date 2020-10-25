@@ -26,6 +26,7 @@ from kivy.utils import platform
 if platform in ['windows', 'linux']:
     import serial
     from serial.tools import list_ports
+    from serial.serialutil import SerialException
     # -- kivy config
     from kivy.config import Config
     Config.set('kivy', 'desktop', 1)  # desktop app (not mobile)
@@ -47,6 +48,7 @@ elif platform == 'android':
 from kivy.app import App
 from kivy.uix.popup import Popup
 from kivy.clock import Clock
+from kivy.logger import Logger
 # --time utilities
 import time
 import datetime
@@ -103,7 +105,9 @@ class BalanceApp(App):
     def update_ports_list(self):
         """ update_ports_list : get available serial ports and set ports_list spinner values"""
         # make a tuple and set spinner values
-        self.root.ids['ports_list'].values = tuple(get_serial_ports_list())
+        ports_found = tuple(get_serial_ports_list())
+        self.root.ids['ports_list'].values = ports_found
+        Logger.info("Serial: {:d} ports found ({:s})".format(len(ports_found),str(ports_found)))
         # if current value is not in list then go back to default
         if self.root.ids['ports_list'].text not in self.root.ids['ports_list'].values:
             self.root.ids['ports_list'].text = 'Port Série'
@@ -149,6 +153,7 @@ class BalanceApp(App):
             p.open()
             p.set_message("Enregistrement", "D\u00e9marrage de la sauvegarde")
             p.close_after(1.)
+            Logger.info("Recording: Start recording values")
         # if saving started then stop it
         else:
             # tell saving is stopped
@@ -164,6 +169,7 @@ class BalanceApp(App):
             p.open()
             p.set_message("Enregistrement", "Arrêt de la sauvegarde")
             p.close_after(1.)
+            Logger.info("Recording: Stop recording values")
 
     def save_data(self):
         """save_data : save a line of data in the data file"""
@@ -171,25 +177,29 @@ class BalanceApp(App):
         line = f"{time.time() - self.start_time:.2f};{self.val:.2f}\n".replace('.', ',')
         # write it
         self.data_file.write(line)
+        Logger.info("Recording: Saving data {:s}".format(line))
 
     def on_connect_btn_press(self):
         """ on_connect_btn_press : what to do when user press connect button """
         # if port is None (if no port selected or present) then dont connect
+        Logger.info("Serial: trying to connect")
         if self.port is None:
             # tell user we cant connect and return
             p = PopupMessage()
             p.open()
             p.set_message("Erreur", "Choisir un port de connexion")
             p.close_after(3.)
+            Logger.warning("Serial: no serial port to connect to")
             return
         # if there a port already opened then try to close
         if self.serialconn is not None:
             # try to close port
+            Logger.info("Serial: trying to close port first")
             try:
                 self.serialconn.close()
                 del self.serialconn
             except:
-                pass
+                Logger.info("Serial: failed to close port")
             # set ui state as disconnected
             self.set_as_disconnected()
             self.serialconn = None
@@ -200,6 +210,7 @@ class BalanceApp(App):
                 # config:
                 # serial port : 9600bauds, 8N1 (as configured on device)
                 # timeout 90% of read interval
+                Logger.info("Serial: connecting to {:s}".format(self.port))
                 self.serialconn = serial.Serial(self.port,
                                                 baudrate=__device_speed__,
                                                 bytesize=__device_bits__,
@@ -208,17 +219,19 @@ class BalanceApp(App):
                                                 timeout=__read_interval__ * 0.9)
                 # set ui state as connected
                 self.set_as_connected()
+                Logger.info("Serial: Connected.")
                 # tell user it's ok
                 p = PopupMessage()
                 p.open()
                 p.set_message("Balance", "Connexion Ok")
                 p.close_after(1.)
             # if connection failed
-            except:
+            except SerialException as e:
+                Logger.error("Serial: failed to connect ({:s})".format(e.strerror))
                 # tell user we cant connect
                 p = PopupMessage()
                 p.open()
-                p.set_message("Erreur", "Connexion impossible")
+                p.set_message("Erreur", "Connexion impossible \n(Erreur n°" + str(e.errno) + ")")
                 p.close_after(3.)
 
     def set_as_connected(self):
@@ -250,12 +263,14 @@ class BalanceApp(App):
     def read_data(self):
         """ read_data : read data from device """
         # if a port is opened we can read
+        Logger.info("Serial: trying to read data from port")
         if self.serialconn is not None:
             # try read a line
             try:
                 s = self.serialconn.readline()
             # failed then we disconnect the port
             except:
+                Logger.warning("Serial: can't read data (mark as disconnected)")
                 self.set_as_disconnected()
                 del self.serialconn
                 self.serialconn = None
@@ -268,6 +283,9 @@ class BalanceApp(App):
                 self.val = float(s[:-3])  # remove unit and store internally as a float
                 self.root.ids['display_lbl'].text = s  # update display
                 self.root.ids['led_in'].state = 'on'  # show com led as receiving
+                Logger.info("Serial: data read from port (raw: {:s}, float: {:f}g)".format(s,self.val))
+            else:
+                Logger.info("Serial: No data read (timeout)")
 
 
 # create app object
